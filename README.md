@@ -12,6 +12,14 @@ To get the WeedGoblin up and running, you will need the following installed on y
 
 The next step will be to get your openai api key and setup your environment variables. You also need to create an account on your respective chatroom or platform (e.g. Discord).
 
+To get started creating a Discord bot account you'll need to check out the [Discord Developer Portal](https://discordapp.com/developers/applications/). Here you can find all the information you need to get started creating your own Discord application so you can use it to manage your bot.
+
+The environment variables you'll need to set in order to get the WeedGoblin bot up and running are the following:
+
+- WEED_DEBUG - Enable debugging and logging while the bot is running.
+- TOKEN - Your application's Discord bot's access token
+- OPENAI_API_KEY - Your OpenAI API key
+
 Once you have the dependencies and environment variables setup, clone this repository. Inside the root directory of the repository can you run the following command to start the program.
 
 $ python3 bot.py
