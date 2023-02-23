@@ -89,11 +89,8 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    if client.user.mention in message.content:
+    if client.user.mention in message.content or message.content != "":
         await goblin_mode(message.clean_content)
-    elif message.content != "":
-        await goblin_mode(message.content)
-
 
 
 client.run(TOKEN)
