@@ -41,7 +41,7 @@ def get_response(prompt):
         print(prompt)
     response = openai.Completion.create(
         model="text-davinci-003",
-        prompt=f"{prompt}\n\n{client.user.display_name}: ",
+        prompt=f"{prompt}\n\n@{client.user.display_name}: ",
         max_tokens=1024,
         temperature=(1 + len(channel_histories)/32)
     )
