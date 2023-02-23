@@ -57,19 +57,13 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    if DEBUG:
-        print(message.content)
-        print(message.author)
-        print(message)
-    if message.author == client.user:
-        return
 
-    if client.user.mention in message.content:
+    async def goblin_mode(content):
         channel = message.channel
         await channel.typing()
         if DEBUG:
             print(channel)
-        user_prompt = f"@{str(message.author.display_name)}: {str(message.clean_content)}"
+        user_prompt = f"@{str(message.author.display_name)}: {str(content)}"
         if channel not in channel_histories.keys():
             channel_histories[channel] = [PROMPT, user_prompt]
         else:
@@ -87,6 +81,19 @@ async def on_message(message):
             content=response.choices[0].text,
             reference=message,
             allowed_mentions=discord.AllowedMentions.all())
+
+    if DEBUG:
+        print(message.content)
+        print(message.author)
+        print(message)
+    if message.author == client.user:
+        return
+
+    if client.user.mention in message.content:
+        await goblin_mode(message.clean_content)
+    elif message.content != "":
+        await goblin_mode(message.content)
+
 
 
 client.run(TOKEN)
