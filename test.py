@@ -9,9 +9,9 @@ from pydub import AudioSegment
 import io
 
 DEBUG = True
-TOKEN = "MTA3OTgxODkyOTQzNTg1Mjk3MA.GKKdpX.kwvSZJqkQFIpYHYo5WOyVwCKiKw7P7tAbWg84s"
+TOKEN = os.environ.get("TOKEN")
 
-uberduck_client = uberduck.UberDuck('pub_dselihpqtypbbwkxhj', 'pk_7a26317f-d500-4abd-87d8-83fb6721cc8c')
+uberduck_client = uberduck.UberDuck('key', 'secret')
 
 intents=discord.Intents.default()
 intents.guilds = True
