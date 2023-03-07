@@ -1,4 +1,6 @@
 discord.py
 openai
 uberduck
-
+io
+pydub
+discord-ext-audiorec
