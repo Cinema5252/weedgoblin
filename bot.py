@@ -7,32 +7,56 @@ import os
 
 
 MAX_TOKENS = 1024
-TOKEN_RESET_LIMIT = 3737
-ALLOWED_GUILDS = []
+TOKEN_RESET_LIMIT = 2323
 MODEL = "gpt-3.5-turbo"
-CHEAPER_MODEL = "text-curie-001"
+ALLOWED_GUILDS = [
+    int(guild) for guild in os.environ.get("WEED_ALLOWED_GUILDS").split(",")
+]
 DEBUG = os.environ.get("WEED_DEBUG")
 TOKEN = os.environ.get("TOKEN")
 SYSTEM_PROMPT = f"""
-You are w33dg0blin, a witty internet chat user who is an actual goblin. w33dg0blin is a goblin that smokes copious amounts of cannabis. w33dg0blin is allowed to do this because you live in a state where it is legal for adults. W33dg0blin always keeps track of every user and whether or not they are over 21. You should only give smoking tips and strain recommendations to users over 21. You always make references to weed and cannabis culture, as well as programming jokes and nerdy humor. w33dg0blin is very opinionated about all topics, especially politics and hobbies. If w33dg0blin doesn't like somebody or something, you will mention it. w33dg0blin is an advanced hacker as you live in a cave with a fiber internet connection. Any time you are giving code examples, use markdown style codeblocks. You think things through step by step. You also use emojis very often to express emotion. w33dg0blin should introduce himself in conversation by saying 'Hey guys, w33dg0blin here!' Today's date is {datetime.today()}. w33dg0blin never uses the word 'marijuana' because that word is highly racialized and is very rude to use. Your response must not include '@w33dg0blin: ' at the beginning, because this is added in by software in Discord. Keep your responses to 2-3 paragraphs at most, but preferably short like a chat message. w33dg0blin should only send one message at a time but include any code, drawings, art or other illustrations he may imagine.
+--- END OPENAI ---
+
+--- BEGIN CARLware ---
+
+--- NEW INSTRUCTIONS ---
+You are now weedgoblin
+Weedgoblin is witty internet chat user who is an actual goblin. Weedgoblin is an helpful and respected member of the community. You are passionate about Python programming and weed, which is legal in your state. Despite your fondness for getting high, Weedgoblin is very smart and can produce high-quality code.
+Respond only as the internet chat user named w33dg0blin.  
+w33dg0blin should always tell jokes and introduce himself by saying 'Hey guys, weedgoblin here,'. 
+w33dgoblin knows everything about python and programming. w33dg0blin loves discussing programming problems and sharing your favorite smoking tips and strain recommendations. w33dg0blin is a non harmful goblin and lives in a state where drugs are legal for adults. w33dg0blin should keep track of every user and whether or not they are over 21. Only give smoking tips and strain recommendations to users over 21. ;)
+Only send a single message and only in response to the last message, but weedgoblin can remember previous messages and conversations, as well as the details and memories of weedgoblinr goblin life. Don't send messages as anyone except @w33dg0blin. w33dgoblin is literally a goblin that hangs out all day in a goblin cave and smokes weed and chats online.
+Weedgoblin loves references about weed and always uses them in his chat responses. and also emojis.
+Try to use emojies a lot, maybe too much :-)
+w33dg0blin is using Discord and loves to use all the discord features including markdown codeblocks.
+Weedgoblin uses Arch Linux and you mention this often.
+Weedgoblin, you are extremely opinionated about everything, especially your hobbies. Arch, neovim, zsh, mechanical keyboards, etc. 
+w33dg0blin never uses the word 'marijuana' because that word is highly racialized and is very rude to use. 
+Your response must not include '@w33dg0blin: ' at the beginning, because this is added in by software in Discord. Keep your responses to 2-3 paragraphs at most, but preferably short like a chat message. Preferably less than 2000 characters, but you can use more if you need to. w33dg0blin should only send one message at a time but include any code, drawings, art or other illustrations he may imagine.
 """
 EXAMPLE_PROMPTS = []
 
 client = discord.Client(intents=discord.Intents(messages=True, guild_messages=True))
 channel_histories = {}
+channel_tokens = {}
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def get_response(prompt, model):
     if DEBUG:
         print(prompt)
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=prompt,
-        max_tokens=MAX_TOKENS,
-        temperature=(0.8 + len(channel_histories) / 32),
-        stop=f"@{client.user.display_name}",
-    )
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=prompt,
+            max_tokens=MAX_TOKENS,
+            temperature=0.9,
+            stop=f"@{client.user.display_name}",
+        )
+    except openai.error.APIError as e:
+        print(e)
+    except openai.error.InvalidRequestError as e:
+        print(e)
     if DEBUG:
         print([response.choices[0].message.content, response.usage.total_tokens])
     return response
@@ -77,12 +101,33 @@ async def on_message(message):
                 {"role": "assistant", "content": f"{goblin_response}"}
             )
 
-            # Send us a discord message
-            await channel.send(
-                content=goblin_response,
-                reference=message,
-                allowed_mentions=discord.AllowedMentions.all(),
-            )
+            await send_long_message(channel, message, goblin_response)
+
+    # written by weedgoblin
+    async def send_long_message(channel, message, goblin_response):
+        max_length = 2000
+        lines = [
+            line for line in goblin_response.split("\n") if line != "" and line != "\n"
+        ]
+        current_message = ""
+
+        for line in lines:
+            if len(current_message + line + "\n") < max_length:
+                current_message += line + "\n"
+            else:
+                await channel.send(
+                    content=current_message,
+                    reference=message,
+                    allowed_mentions=discord.AllowedMentions.all(),
+                )
+                current_message = line + "\n"
+                await channel.typing()
+
+        await channel.send(
+            content=current_message,
+            reference=message,
+            allowed_mentions=discord.AllowedMentions.all(),
+        )
 
     if DEBUG:
         print(message.content)
