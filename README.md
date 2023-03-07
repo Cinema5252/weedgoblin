@@ -19,6 +19,8 @@ The environment variables you'll need to set in order to get the WeedGoblin bot 
 - WEED_DEBUG - Enable debugging and logging while the bot is running.
 - TOKEN - Your application's Discord bot's access token
 - OPENAI_API_KEY - Your OpenAI API key
+- UBERDUCK_CLIENT_ID - Your uberDuck client id
+- UBERDUCK_API_KEY - Your uberDuck API Key/Secret
 
 Once you have the dependencies and environment variables setup, clone this repository. Inside the root directory of the repository can you run the following command to start the program.
 
