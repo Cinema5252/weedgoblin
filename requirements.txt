@@ -1,3 +1,7 @@
 discord.py
 openai
+html2text
+markdownify
 tiktoken
+readability-lxml
+requests
