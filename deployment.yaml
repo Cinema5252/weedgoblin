@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weedgoblin
+spec:
+  selector:
+    matchLabels:
+      app: weedgoblin
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: weedgoblin
+    spec:
+      containers:
+        - name: weedgoblin
+          image: your-docker-image-name-here
+          env:
+            - name: WEED_ALLOWED_GUILDS
+              value: your_allowed_guilds_here
+            - name: WEED_DEBUG
+              value: "True or False"
+            - name: TOKEN
+              value: your_token_here
+            - name: OPENAI_API_KEY
+              value: your_openai_api_key_here
