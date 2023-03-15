@@ -1,6 +1,8 @@
 discord.py
 openai
+add-voice-bot
 uberduck
 io
 pydub
 discord-ext-audiorec
+tiktoken
