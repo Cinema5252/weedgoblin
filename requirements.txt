@@ -1,7 +1,5 @@
 discord.py
 openai
-html2text
-markdownify
 tiktoken
-readability-lxml
-requests
+newspaper3k
+bleach
