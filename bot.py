@@ -13,8 +13,8 @@ import re
 import tiktoken
 
 
-MAX_TOKENS = 2048
-TOKEN_RESET_LIMIT = 4096 - 256 - MAX_TOKENS
+MAX_TOKENS = 4096
+TOKEN_RESET_LIMIT = 8192 - 256 - (MAX_TOKENS // 2)
 MODEL = "gpt-4"
 ALLOWED_GUILDS = [
     int(guild) for guild in os.environ.get("WEED_ALLOWED_GUILDS").split(",")
