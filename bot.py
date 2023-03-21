@@ -234,8 +234,7 @@ async def send_long_message(channel, message, goblin_response):
                 allowed_mentions=discord.AllowedMentions.all(),
             )
             current_message = line + "\n"
-            with await channel.typing():
-                asyncio.sleep(3)
+            await channel.typing()
 
     await channel.send(
         content=current_message,
