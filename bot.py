@@ -10,6 +10,7 @@ import discord
 import openai
 import os
 import re
+import textwrap
 import tiktoken
 import random
 
@@ -17,7 +18,7 @@ import random
 MAX_TOKENS = 4096
 TOKEN_RESET_LIMIT = 8192 - 256 - MAX_TOKENS
 MODEL = "gpt-4"
-SUMMARIZE_MODEL = "gpt-3.5-turbo"
+SUMMARIZE_MODEL = "gpt-4"
 ALLOWED_GUILDS = [
     int(guild) for guild in os.environ.get("WEED_ALLOWED_GUILDS").split(",")
 ]
@@ -238,40 +239,84 @@ async def goblin_mode(message):
             await send_long_message(channel, message, goblin_response)
 
 
-# written by weedgoblin
-async def send_long_message(channel, message, goblin_response):
-    max_length = 2000
-    codeblock_pattern = r"```.*?```"
-    split_positions = [0]
-    for match in re.finditer(codeblock_pattern, goblin_response, re.DOTALL):
-        split_positions.extend([match.start(), match.end()])
-    split_positions.append(len(goblin_response))
-
-    split_response = [
-        goblin_response[start:end]
-        for start, end in zip(split_positions[:-1], split_positions[1:])
-    ]
-    lines = [line for line in split_response if line.strip() != ""]
-    current_message = ""
-    for line in lines:
-        if len(current_message + line) < max_length:
-            current_message += line
-        else:
-            if current_message.strip() != "":
-                await channel.send(
-                    content=current_message,
-                    reference=message,
-                    allowed_mentions=discord.AllowedMentions.all(),
-                )
-            current_message = line
-            channel.typing()
-
-    if current_message.strip() != "":
+async def send_message(channel, content, message):
+    if content.strip() != "":
         await channel.send(
-            content=current_message,
+            content=content,
             reference=message,
             allowed_mentions=discord.AllowedMentions.all(),
         )
+
+
+async def send_long_message(channel, message, goblin_response):
+    if not goblin_response:
+        goblin_response = "Oh, okay."
+    message_length = len(goblin_response)
+    max_length = 1980
+    if DEBUG:
+        print(goblin_response)
+        print(message_length)
+
+    if message_length <= max_length:
+        if DEBUG:
+            print("Message was under or equal to max_length=2000")
+        await send_message(channel, goblin_response.strip(), message)
+    else:
+        if DEBUG:
+            print("Message length is more than max_length=2000")
+        codeblock_pattern = r"```.*?```"
+        codeblocks = list(re.finditer(codeblock_pattern, goblin_response, re.DOTALL))
+        if DEBUG:
+            print(f"Message has {len(codeblocks)} codeblocks")
+        codeblock_positions = [
+            (
+                goblin_response[: m.start()].count("\n"),
+                goblin_response[: m.end()].count("\n"),
+            )
+            for m in codeblocks
+        ]
+        if DEBUG:
+            print(f"Codeblocks are located at {codeblock_positions}")
+        lines = goblin_response.split("\n")
+        wrapped_lines = []
+        for line in lines:
+            if len(line) > max_length:
+                if DEBUG:
+                    print("line too long, wrapping")
+                wrapped = textwrap.wrap(line, max_length - 1)
+                wrapped_lines.extend(wrapped)
+            else:
+                wrapped_lines.append(line)
+        print(wrapped_lines)
+        chunks = [""]
+        chunk_id = 0
+        current_chunk = []
+        for idx, line in enumerate(wrapped_lines):
+            is_in_codeblock = False
+            codeblock_start = -1
+            for check in codeblock_positions:
+                if check[0] <= idx <= check[1]:
+                    is_in_codeblock = True
+                    codeblock_start = check[0]
+
+            if len(chunks[chunk_id] + line + "\n") > max_length:
+                if is_in_codeblock:
+                    next_chunk = current_chunk[codeblock_start:]
+                    current_chunk = current_chunk[: idx + codeblock_start]
+                    chunks[chunk_id + 1] = "".join(next_chunk)
+                chunks[chunk_id] = "".join(current_chunk)
+                print(f"chunk: {chunk_id} {chunks[chunk_id]}")
+                chunk_id += 1
+                current_chunk.append(line + "\n")
+            else:
+                current_chunk.append(line + "\n")
+        print(chunks)
+
+        for chunk_id, chunk in enumerate(chunks):
+            await send_message(channel, chunk, message)
+            if chunk_id != len(chunks) - 1:
+                async with channel.typing():
+                    pass
 
 
 @client.event
