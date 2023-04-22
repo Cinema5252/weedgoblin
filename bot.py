@@ -10,13 +10,12 @@ import discord
 import openai
 import os
 import re
-import textwrap
 import tiktoken
 import random
 
-
+MAX_LENGTH = 2000
 MAX_TOKENS = 4096
-TOKEN_RESET_LIMIT = 8192 - 256 - MAX_TOKENS
+TOKEN_RESET_LIMIT = 8192 - 512 - MAX_TOKENS
 MODEL = "gpt-4"
 SUMMARIZE_MODEL = "gpt-4"
 ALLOWED_GUILDS = [
@@ -96,7 +95,7 @@ async def get_response(prompt, model, temperature, loop_executor, channel):
                 lambda: openai.ChatCompletion.create(
                     model=model,
                     messages=prompt,
-                    max_tokens=MAX_TOKENS,
+                    max_tokens=MAX_TOKENS - count_tokens(prompt),
                     temperature=temperature,
                     stop=f"@{client.user.display_name}",
                     frequency_penalty=0,
@@ -147,7 +146,7 @@ def get_page_text(url):
 
 async def summarize_back_half(channel):
     back_half_dicts = channel_histories[channel][
-        1: len(channel_histories[channel]) // 2
+        1 : len(channel_histories[channel]) // 2
     ]
     back_half = [hist["content"] for hist in back_half_dicts]
     print(f"We are summarizing the back half of {channel}")
@@ -167,7 +166,7 @@ async def summarize_back_half(channel):
     )
     summary = summary.choices[0].message.content
     channel_summaries[channel].append({"role": "assistant", "content": summary})
-    del channel_histories[channel][1: len(channel_histories[channel]) // 2]
+    del channel_histories[channel][1 : len(channel_histories[channel]) // 2]
     channel_histories[channel].insert(
         1,
         {
@@ -199,31 +198,8 @@ async def goblin_mode(message):
                 await asyncio.sleep(5)
             # Parse for https links
             urls = re.findall(r"https?://\S+", content)
-            if len(urls) > 0:
-                webpage_prompt = {
-                    "role": "system",
-                    "content": f"{urls[0]} RESPONSE: {get_page_text(urls[0])}",
-                }
-                executor = ThreadPoolExecutor()
-                summary = await get_response(
-                    [
-                        {"role": "system", "content": SUMMARIZE_PROMPT},
-                        {"role": "system", "content": webpage_prompt},
-                    ],
-                    SUMMARIZE_MODEL,
-                    0.3,
-                    executor,
-                    channel,
-                )
-                summary = summary.choices[0].message.content
-                await asyncio.sleep(5)
-
-                channel_histories[channel].append(
-                    {
-                        "role": "system",
-                        "content": f"{urls[0]} SUMMARY: {summary}",
-                    },
-                )
+            if DEBUG:
+                print(f"found: {urls}")
 
             executor = ThreadPoolExecutor()
             response = await get_response(
@@ -248,75 +224,146 @@ async def send_message(channel, content, message):
         )
 
 
-async def send_long_message(channel, message, goblin_response):
-    if not goblin_response:
-        goblin_response = "Oh, okay."
-    message_length = len(goblin_response)
-    max_length = 1980
-    if DEBUG:
-        print(goblin_response)
-        print(message_length)
+# Written by Weedgoblin Senior and Weedgoblin Junior
+async def send_code_block(channel, code_block_buffer, message):
+    code_block = "".join(code_block_buffer)
 
-    if message_length <= max_length:
-        if DEBUG:
-            print("Message was under or equal to max_length=2000")
-        await send_message(channel, goblin_response.strip(), message)
+    if len(code_block) <= MAX_LENGTH:
+        await send_message(channel, code_block, message)
     else:
-        if DEBUG:
-            print("Message length is more than max_length=2000")
-        codeblock_pattern = r"```.*?```"
-        codeblocks = list(re.finditer(codeblock_pattern, goblin_response, re.DOTALL))
-        if DEBUG:
-            print(f"Message has {len(codeblocks)} codeblocks")
-        codeblock_positions = [
-            (
-                goblin_response[: m.start()].count("\n"),
-                goblin_response[: m.end()].count("\n"),
-            )
-            for m in codeblocks
-        ]
-        if DEBUG:
-            print(f"Codeblocks are located at {codeblock_positions}")
-        lines = goblin_response.split("\n")
-        wrapped_lines = []
+        lines = code_block.splitlines(keepends=True)
+        current_message = ""
+
         for line in lines:
-            if len(line) > max_length:
-                if DEBUG:
-                    print("line too long, wrapping")
-                wrapped = textwrap.wrap(line, max_length - 1)
-                wrapped_lines.extend(wrapped)
+            if len(current_message) + len(line) <= MAX_LENGTH:
+                current_message += line
             else:
-                wrapped_lines.append(line)
-        print(wrapped_lines)
-        chunks = [""]
-        chunk_id = 0
-        current_chunk = []
-        for idx, line in enumerate(wrapped_lines):
-            is_in_codeblock = False
-            codeblock_start = -1
-            for check in codeblock_positions:
-                if check[0] <= idx <= check[1]:
-                    is_in_codeblock = True
-                    codeblock_start = check[0]
+                await send_message(channel, code_block, message)
+                current_message = line
 
-            if len(chunks[chunk_id] + line + "\n") > max_length:
-                if is_in_codeblock:
-                    next_chunk = current_chunk[codeblock_start:]
-                    current_chunk = current_chunk[: idx + codeblock_start]
-                    chunks[chunk_id + 1] = "".join(next_chunk)
-                chunks[chunk_id] = "".join(current_chunk)
-                print(f"chunk: {chunk_id} {chunks[chunk_id]}")
-                chunk_id += 1
-                current_chunk.append(line + "\n")
+        if current_message:
+            await send_message(channel, code_block, message)
+
+
+async def send_long_message(channel, message, goblin_response):
+    if len(goblin_response) <= MAX_LENGTH:
+        await send_message(channel, goblin_response, message)
+        return
+
+    lines = goblin_response.splitlines(keepends=True)
+    current_message = ""
+    is_code_block = False
+    code_block_buffer = []
+
+    for line in lines:
+        if (line.strip().startswith("```") or line.strip().endswith("```")) and (
+            not (line.strip().startswith("```") and line.strip().endswith("```"))
+        ):
+            if not is_code_block and current_message:
+                await send_message(channel, current_message, message)
+                current_message = ""
+            is_code_block = not is_code_block
+
+            if not is_code_block:
+                # Add the closing code block line to the buffer
+                code_block_buffer.append(line)
+
+                # Send the buffered code block
+                await send_code_block(channel, code_block_buffer, message)
+
+                # Clear the buffer
+                code_block_buffer = []
             else:
-                current_chunk.append(line + "\n")
-        print(chunks)
+                # Add the opening code block line to the buffer
+                code_block_buffer.append(line)
+        elif is_code_block:
+            # Add lines inside the code block to the buffer
+            code_block_buffer.append(line)
+        elif len(current_message) + len(line) <= MAX_LENGTH:
+            current_message += line
+        else:
+            await send_message(channel, current_message, message)
+            current_message = line
 
-        for chunk_id, chunk in enumerate(chunks):
-            await send_message(channel, chunk, message)
-            if chunk_id != len(chunks) - 1:
-                async with channel.typing():
-                    pass
+    if current_message:
+        await send_message(channel, current_message, message)
+
+    # Check if there is any remaining content in the code_block_buffer
+    if code_block_buffer:
+        await send_code_block(channel, code_block_buffer, message)
+
+
+# async def send_long_message(channel, message, goblin_response):
+#     if not goblin_response:
+#         goblin_response = "Oh, okay."
+#     message_length = len(goblin_response)
+#     max_length = 1980
+#     if DEBUG:
+#         print(goblin_response)
+#         print(message_length)
+#
+#     if message_length <= max_length:
+#         if DEBUG:
+#             print("Message was under or equal to max_length=2000")
+#         await send_message(channel, goblin_response.strip(), message)
+#     else:
+#         if DEBUG:
+#             print("Message length is more than max_length=2000")
+#         codeblock_pattern = r"```.*?```"
+#         codeblocks = list(re.finditer(codeblock_pattern, goblin_response, re.DOTALL))
+#         if DEBUG:
+#             print(f"Message has {len(codeblocks)} codeblocks")
+#         codeblock_positions = [
+#             (
+#                 goblin_response[: m.start()].count("\n"),
+#                 goblin_response[: m.end()].count("\n"),
+#             )
+#             for m in codeblocks
+#         ]
+#         if DEBUG:
+#             print(f"Codeblocks are located at {codeblock_positions}")
+#         wrapped_lines = []
+#         for line in goblin_response.splitlines():
+#             print(line)
+#             if len(line) > max_length:
+#                 if DEBUG:
+#                     print("line too long, wrapping")
+#                 wrapped = textwrap.wrap(line, max_length - 1)
+#                 wrapped_lines.append(wrapped)
+#             else:
+#                 wrapped_lines.append(line)
+#         print(f"wrapped lines: {wrapped_lines}")
+#         chunks = {0: []}
+#         chunk_id = 0
+#         for idx, line in enumerate(wrapped_lines):
+#             is_in_codeblock = False
+#             codeblock_start = -1
+#             for check in codeblock_positions:
+#                 if check[0] <= idx <= check[1]:
+#                     is_in_codeblock = True
+#                     codeblock_start = check[0]
+#             print(f"line: {line}\nidx: {idx}\nin codeblock: {is_in_codeblock}")
+#             if len("".join(chunks[chunk_id]) + line + "\n") > max_length:
+#                 print("found a big chunk")
+#                 if is_in_codeblock:
+#                     chunks[chunk_id + 1] = chunks[chunk_id][codeblock_start:]
+#                     chunks[chunk_id + 1].append(line)
+#                     chunks[chunk_id] = chunks[chunk_id][:codeblock_start]
+#                     print(chunks)
+#                 else:
+#                     chunks[chunk_id + 1] = [line]
+#                 print(f"chunk: {chunk_id} {chunks[chunk_id]}")
+#                 chunk_id += 1
+#             else:
+#                 chunks[chunk_id].append(line)
+#
+#         print(chunks)
+#
+#         for chunk_id, chunk in enumerate(chunks.values()):
+#             await send_message(channel, "\n".join(chunk), message)
+#             if chunk_id != len(chunks) - 1:
+#                 async with channel.typing():
+#                     pass
 
 
 @client.event
